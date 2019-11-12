@@ -1,3 +1,4 @@
+build/
 *.o
 *.x
 *.d
@@ -8,7 +9,6 @@
 *.htm
 *.html
 *.dll
-*.txt
 *.patch
 *.orig
 *.out
