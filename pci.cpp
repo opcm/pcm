@@ -22,6 +22,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <fcntl.h>
 #include "pci.h"
 
+#include "CommonMSRDriver/whitelist.h"
+
 #ifndef _MSC_VER
 #include <sys/mman.h>
 #include <errno.h>
@@ -93,6 +95,12 @@ int32 PciHandle::read32(uint64 offset, uint32 * value)
         req.bytes = sizeof(uint32);
         req.reg = (ULONG)offset;
 
+        if (!AllowPCICFGAccess(device, (DWORD)offset))
+        {
+            *value = (uint32)nullptr;
+            return sizeof(uint32);
+        }
+
         BOOL status = DeviceIoControl(hDriver, IO_CTL_PCICFG_READ, &req, (DWORD)sizeof(PCICFG_Request), &result, (DWORD)sizeof(uint64), &reslength, NULL);
         *value = (uint32)result;
         if (!status)
@@ -124,6 +132,11 @@ int32 PciHandle::write32(uint64 offset, uint32 value)
         req.reg = (uint32)offset;
         req.write_value = value;
 
+        if (!AllowPCICFGAccess(device, (DWORD)offset))
+        {
+            return sizeof(uint32);
+        }
+
         BOOL status = DeviceIoControl(hDriver, IO_CTL_PCICFG_WRITE, &req, (DWORD)sizeof(PCICFG_Request), &result, (DWORD)sizeof(uint64), &reslength, NULL);
         if (!status)
         {
@@ -138,6 +151,12 @@ int32 PciHandle::write32(uint64 offset, uint32 value)
 
 int32 PciHandle::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, (uint32)offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+    
     if (hDriver != INVALID_HANDLE_VALUE)
     {
         PCICFG_Request req;
@@ -207,18 +226,35 @@ bool PciHandle::exists(uint32 groupnr_, uint32 bus_, uint32 device_, uint32 func
 
 int32 PciHandle::read32(uint64 offset, uint32 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint32)nullptr;
+        return sizeof(uint32);
+    }
+
     uint32_t pci_address = FORM_PCI_ADDR(bus, device, function, (uint32_t)offset);
     return PCIDriver_read32(pci_address, value);
 }
 
 int32 PciHandle::write32(uint64 offset, uint32 value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        return sizeof(uint32);
+    }
+
     uint32_t pci_address = FORM_PCI_ADDR(bus, device, function, (uint32_t)offset);
     return PCIDriver_write32(pci_address, value);
 }
 
 int32 PciHandle::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+
     uint32_t pci_address = FORM_PCI_ADDR(bus, device, function, (uint32_t)offset);
     return PCIDriver_read64(pci_address, value);
 }
@@ -286,6 +322,12 @@ bool PciHandle::exists(uint32 groupnr_, uint32 bus_, uint32 device_, uint32 func
 
 int32 PciHandle::read32(uint64 offset, uint32 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint32)nullptr;
+        return sizeof(uint32);
+    }
+
     struct pci_io pi;
     int ret;
 
@@ -305,6 +347,11 @@ int32 PciHandle::read32(uint64 offset, uint32 * value)
 
 int32 PciHandle::write32(uint64 offset, uint32 value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        return sizeof(uint32);
+    }
+
     struct pci_io pi;
     int ret;
 
@@ -324,6 +371,12 @@ int32 PciHandle::write32(uint64 offset, uint32 value)
 
 int32 PciHandle::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+
     struct pci_io pi;
     int32 ret;
 
@@ -415,16 +468,33 @@ bool PciHandle::exists(uint32 groupnr_, uint32 bus_, uint32 device_, uint32 func
 
 int32 PciHandle::read32(uint64 offset, uint32 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint32)nullptr;
+        return sizeof(uint32);
+    }
+
     return ::pread(fd, (void *)value, sizeof(uint32), offset);
 }
 
 int32 PciHandle::write32(uint64 offset, uint32 value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        return sizeof(uint32);
+    }
+
     return ::pwrite(fd, (const void *)&value, sizeof(uint32), offset);
 }
 
 int32 PciHandle::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+
     size_t res = ::pread(fd, (void *)value, sizeof(uint64), offset);
     if(res != sizeof(uint64))
     {
@@ -526,16 +596,33 @@ bool PciHandleM::exists(uint32 /*groupnr_*/, uint32 /* bus_*/, uint32 /* device_
 
 int32 PciHandleM::read32(uint64 offset, uint32 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint32)nullptr;
+        return sizeof(uint32);
+    }
+
     return ::pread(fd, (void *)value, sizeof(uint32), offset + base_addr);
 }
 
 int32 PciHandleM::write32(uint64 offset, uint32 value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        return sizeof(uint32);
+    }
+
     return ::pwrite(fd, (const void *)&value, sizeof(uint32), offset + base_addr);
 }
 
 int32 PciHandleM::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+
     return ::pread(fd, (void *)value, sizeof(uint64), offset + base_addr);
 }
 
@@ -676,6 +763,12 @@ bool PciHandleMM::exists(uint32 /*groupnr_*/, uint32 bus_, uint32 device_, uint3
 
 int32 PciHandleMM::read32(uint64 offset, uint32 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint32)nullptr;
+        return sizeof(uint32);
+    }
+
     *value = *((uint32 *)(mmapAddr + offset));
 
     return sizeof(uint32);
@@ -683,6 +776,11 @@ int32 PciHandleMM::read32(uint64 offset, uint32 * value)
 
 int32 PciHandleMM::write32(uint64 offset, uint32 value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        return sizeof(uint32);
+    }
+
     *((uint32 *)(mmapAddr + offset)) = value;
 
     return sizeof(uint32);
@@ -690,6 +788,12 @@ int32 PciHandleMM::write32(uint64 offset, uint32 value)
 
 int32 PciHandleMM::read64(uint64 offset, uint64 * value)
 {
+    if (!AllowPCICFGAccess(device, offset))
+    {
+        *value = (uint64)nullptr;
+        return sizeof(uint32);
+    }
+
     read32(offset, (uint32 *)value);
     read32(offset + sizeof(uint32), ((uint32 *)value) + 1);
 
